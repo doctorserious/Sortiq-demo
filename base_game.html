@@ -156,6 +156,52 @@
         }
         .bin-label .sublabel { font-size: 10px; color: #bbb; font-weight: 400; margin-top: 2px; }
         
+        /* ── Mobile bin grid ── */
+        #mobile-bins {
+            display: none; /* shown only on mobile */
+            position: absolute; bottom: 0; left: 0; right: 0;
+            padding: 6px 6px 10px;
+            background: rgba(15,15,40,0.82);
+            backdrop-filter: blur(10px);
+            pointer-events: all; z-index: 15;
+        }
+        #mobile-bins .bin-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+        }
+        .mob-bin-btn {
+            background: rgba(30,30,60,0.9);
+            border: 1.5px solid rgba(255,255,255,0.15);
+            border-radius: 10px; padding: 6px 4px;
+            color: white; font-family: 'Fredoka', sans-serif;
+            font-size: 11px; font-weight: 600;
+            cursor: pointer; text-align: center;
+            transition: transform .12s, background .12s;
+            line-height: 1.25; pointer-events: all;
+        }
+        .mob-bin-btn:active { transform: scale(0.93); }
+        .mob-bin-btn .mob-icon { font-size: 22px; display: block; margin-bottom: 2px; }
+        .mob-bin-btn .mob-name { display: block; font-size: 10px; font-weight: 700; }
+        .mob-bin-btn .mob-sub  { display: block; font-size: 9px; color: #aaa; }
+
+        /* On mobile: shrink item display and timer, hide 3D labels */
+        @media (max-width: 600px) {
+            #mobile-bins { display: block; }
+            .bin-label { display: none !important; }
+            #item-display {
+                bottom: auto; top: 110px;
+                padding: 10px 20px;
+            }
+            #item-name { font-size: 20px; }
+            #item-hint { font-size: 13px; }
+            #timer-container { bottom: auto; top: 190px; width: 220px; }
+            .score-box { padding: 8px 14px; }
+            .score-label { font-size: 9px; }
+            .score-value { font-size: 24px; }
+            .hud { top: 10px; left: 10px; right: 10px; }
+        }
+        
         .instructions {
             color: #7a88a0; margin-top: 24px; text-align: center;
             font-size: 15px; line-height: 1.9;
@@ -204,6 +250,11 @@
         <div id="fact-box"><div id="fact-text"></div></div>
         <button class="btn" onclick="game.start()">TRY AGAIN</button>
     </div>
+
+    <!-- Mobile 2×4 bin button grid -->
+    <div id="mobile-bins" style="display:none">
+      <div class="bin-grid" id="mob-bin-grid"></div>
+    </div>
 </div>
 
 <script>
@@ -217,6 +268,27 @@ const BIN_TYPES = {
     BURNABLE:  { id:'burnable',  name:'Burnable waste',     subtitle:'Mixed / last resort',color:0xcc4422, labelColor:'#ff6347', position: 2.5, icon:'🔥' },
     CENTER:    { id:'center',    name:'Recycling Centre',   subtitle:'Large & hazardous',  color:0xb8900a, labelColor:'#FFD700', position: 3.5, icon:'🏭' }
 };
+
+const isMobile = () => window.innerWidth <= 600;
+
+/* Build the 2×4 mobile button grid once */
+function buildMobileButtons(game) {
+    const grid = document.getElementById('mob-bin-grid');
+    grid.innerHTML = '';
+    Object.values(BIN_TYPES).forEach(bt => {
+        const btn = document.createElement('button');
+        btn.className = 'mob-bin-btn';
+        btn.style.borderColor = bt.labelColor + '66';
+        btn.innerHTML = `<span class="mob-icon">${bt.icon}</span><span class="mob-name" style="color:${bt.labelColor}">${bt.name}</span><span class="mob-sub">${bt.subtitle}</span>`;
+        btn.addEventListener('click', () => {
+            if (!game.gameActive || game.itemFlying) return;
+            const bin = game.bins.find(b => b.userData.type === bt.id);
+            if (bin) game.throwItemToBin(bin);
+        });
+        btn.id = `mob-btn-${bt.id}`;
+        grid.appendChild(btn);
+    });
+}
 
 const ITEMS = [
     // Cardboard / cartons
@@ -452,7 +524,12 @@ class SortGame {
         createSkyGradient(this.scene);
 
         this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
-        this.camera.position.set(0, 10, 20);
+        if (isMobile()) {
+            /* zoom in so the floating item fills the upper half; bins are hidden by the HTML grid */
+            this.camera.position.set(0, 6, 10);
+        } else {
+            this.camera.position.set(0, 10, 20);
+        }
         this.camera.lookAt(0, 0, 0);
 
         this.renderer = new THREE.WebGLRenderer({ antialias:true });
@@ -511,6 +588,7 @@ class SortGame {
         this.scene.add(path);
 
         this.createBins();
+        buildMobileButtons(this);
         this.setupInput();
         this.animate();
         document.getElementById('high-score').textContent = this.highScore;
@@ -807,6 +885,7 @@ class SortGame {
             document.getElementById('timer-container').style.display='none';
             document.getElementById('phase-indicator').classList.remove('active');
             document.querySelectorAll('.bin-label').forEach(l => l.style.display='none');
+            document.getElementById('mobile-bins').style.display='none';
         }, 1000);
     }
 
@@ -821,6 +900,7 @@ class SortGame {
         document.getElementById('item-display').style.display='block';
         document.getElementById('timer-container').style.display='block';
         document.querySelectorAll('.bin-label').forEach(l => l.style.display='block');
+        if (isMobile()) document.getElementById('mobile-bins').style.display='block';
         this.spawnItem();
     }
 
@@ -828,6 +908,12 @@ class SortGame {
         this.camera.aspect = window.innerWidth/window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        if (isMobile()) {
+            this.camera.position.set(0, 6, 10);
+        } else {
+            this.camera.position.set(0, 10, 20);
+        }
+        this.camera.lookAt(0, 0, 0);
     }
 
     animate() {
