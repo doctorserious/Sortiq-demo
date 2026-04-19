@@ -10,6 +10,7 @@ SortIQ is an interactive mobile web app that helps people learn proper waste sor
 
 ## Link
 https://doctorserious.github.io/Sortiq-demo/
+
 NOTE: The AI scanner won't function properly in the demo, due to the classifying API being disabled.
 
 ## QR code
