@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sort Rush - Recycling Challenge</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            overflow: hidden;
+            font-family: 'Fredoka', sans-serif;
+            background: #1a1a2e;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        #game-container { width: 100vw; height: 100vh; position: relative; }
+        canvas { display: block; }
+        
+        #ui-layer {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; z-index: 10;
+        }
+        
+        .hud {
+            position: absolute; top: 20px; left: 20px; right: 20px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+        }
+        
+        .score-box {
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(8px);
+            padding: 12px 22px; border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 2px 0 rgba(255,255,255,0.6) inset;
+            text-align: center;
+            transform: scale(0);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        
+        .score-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; }
+        .score-value { font-size: 34px; font-weight: 700; color: #2d3436; line-height: 1; margin-top: 3px; }
+        
+        .combo-display {
+            position: absolute; top: 100px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 48px; font-weight: 700;
+            color: #ffd700; text-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            opacity: 0; transition: all 0.3s; pointer-events: none;
+        }
+        .combo-display.active { opacity: 1; transform: translateX(-50%) scale(1.2); }
+        
+        #item-display {
+            position: absolute; bottom: 175px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.93);
+            backdrop-filter: blur(10px);
+            padding: 16px 36px; border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+            text-align: center; pointer-events: none; transition: all 0.3s;
+        }
+        #item-name { font-size: 26px; font-weight: 700; color: #2d3436; margin-bottom: 6px; }
+        #item-hint { font-size: 15px; color: #636e72; font-weight: 600; }
+        
+        #timer-container {
+            position: absolute; bottom: 118px; left: 50%;
+            transform: translateX(-50%); width: 300px; height: 10px;
+            background: rgba(255,255,255,0.25); border-radius: 5px; overflow: hidden;
+        }
+        #timer-bar {
+            width: 100%; height: 100%; background: #00b894; border-radius: 5px;
+            transition: width 0.1s linear, background 0.3s;
+        }
+        
+        #phase-indicator {
+            position: absolute; top: 90px; right: 20px;
+            background: rgba(255,255,255,0.88);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px; border-radius: 12px;
+            font-weight: 700; font-size: 14px; color: #2d3436;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            opacity: 0; transition: opacity 0.3s;
+        }
+        #phase-indicator.active { opacity: 1; }
+        
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            background: linear-gradient(135deg, rgba(15,15,40,0.97) 0%, rgba(30,20,60,0.97) 50%, rgba(10,30,50,0.97) 100%);
+            pointer-events: all; z-index: 20; transition: opacity 0.5s;
+        }
+        .screen.hidden { opacity: 0; pointer-events: none; }
+        
+        h1 {
+            font-size: 64px; color: #fff; margin-bottom: 10px;
+            text-shadow: 0 4px 20px rgba(100,200,255,0.4);
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .subtitle {
+            font-size: 19px; color: #b0b8cc; margin-bottom: 36px;
+            max-width: 500px; text-align: center; line-height: 1.6;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #00c9a7, #00b894);
+            color: white; border: none; padding: 16px 46px;
+            font-size: 22px; font-family: 'Fredoka', sans-serif;
+            font-weight: 700; border-radius: 50px; cursor: pointer;
+            box-shadow: 0 6px 24px rgba(0,200,160,0.45);
+            transition: all 0.2s; pointer-events: all; margin: 10px;
+        }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,200,160,0.6); }
+        .btn:active { transform: translateY(0); }
+        
+        #game-over h2 { font-size: 48px; color: #ff6b6b; margin-bottom: 10px; }
+        #final-score { font-size: 72px; color: #ffd700; margin: 20px 0; text-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        
+        #fact-box {
+            background: rgba(255,255,255,0.08);
+            padding: 20px; border-radius: 16px;
+            max-width: 520px; text-align: center; margin: 20px 0;
+            border: 2px solid rgba(255,255,255,0.15);
+        }
+        #fact-text { color: #fff; font-size: 18px; line-height: 1.5; }
+        .correct-bin { color: #00c9a7; font-weight: 700; }
+        .wrong-bin { color: #ff6b6b; font-weight: 700; }
+        
+        #speed-up {
+            position: absolute; top: 45%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.5);
+            font-size: 72px; font-weight: 700; color: #ff6b6b;
+            text-shadow: 0 6px 20px rgba(0,0,0,0.6);
+            opacity: 0; pointer-events: none; z-index: 30;
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            white-space: nowrap;
+        }
+        #speed-up.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        
+        @keyframes popIn { to { transform: scale(1); } }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-10px)} 75%{transform:translateX(10px)} }
+        .shake { animation: shake 0.4s ease-in-out; }
+        
+        .bin-label {
+            position: absolute; color: white; font-weight: 700; font-size: 13px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.9); pointer-events: none;
+            text-align: center; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+            padding: 6px 11px; border-radius: 10px; line-height: 1.3;
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .bin-label .sublabel { font-size: 10px; color: #bbb; font-weight: 400; margin-top: 2px; }
+        
+        .instructions {
+            color: #7a88a0; margin-top: 24px; text-align: center;
+            font-size: 15px; line-height: 1.9;
+        }
+        .key {
+            display: inline-block; background: rgba(255,255,255,0.15);
+            padding: 3px 10px; border-radius: 6px; margin: 0 4px;
+            font-weight: 700; color: #fff;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<div id="game-container">
+    <div id="ui-layer">
+        <div class="hud" id="hud" style="display:none;">
+            <div class="score-box"><div class="score-label">Score</div><div class="score-value" id="score">0</div></div>
+            <div class="score-box"><div class="score-label">High Score</div><div class="score-value" id="high-score">0</div></div>
+            <div class="score-box"><div class="score-label">Items</div><div class="score-value" id="items-count">0</div></div>
+        </div>
+        <div id="phase-indicator">🐢 Relaxed Mode</div>
+        <div class="combo-display" id="combo">x2</div>
+        <div id="speed-up">SPEED UP!</div>
+        <div id="item-display" style="display:none;">
+            <div id="item-name">Cardboard Box</div>
+            <div id="item-hint">Click the correct bin!</div>
+        </div>
+        <div id="timer-container" style="display:none;"><div id="timer-bar"></div></div>
+    </div>
+
+    <div class="screen" id="start-screen">
+        <h1>♻️ Sort Rush</h1>
+        <div class="subtitle">Sort trash fast, score big, learn recycling!<br>Click the correct bin. Wrong bin = Game Over!</div>
+        <button class="btn" onclick="game.start()">PLAY NOW</button>
+        <div class="instructions">
+            <span class="key">Click/Tap</span> the correct bin for each item<br>
+            <span class="key">Speed</span> matters — faster = more points<br>
+            <span class="key">First 8 items</span> are relaxed for learning!<br><br>
+            <span style="color:#00c9a7;font-weight:600;">The challenge is KNOWING where it goes!</span>
+        </div>
+    </div>
+
+    <div class="screen hidden" id="game-over">
+        <h2>Game Over!</h2>
+        <div id="final-score">0</div>
+        <div id="fact-box"><div id="fact-text"></div></div>
+        <button class="btn" onclick="game.start()">TRY AGAIN</button>
+    </div>
+</div>
+
+<script>
+const BIN_TYPES = {
+    BIO:       { id:'bio',       name:'Bio waste',          subtitle:'Food & organic',     color:0x5a7a1a, labelColor:'#7aaf22', position:-3.5, icon:'🌿' },
+    CARDBOARD: { id:'cardboard', name:'Paperboard/Carton',  subtitle:'Boxes & cartons',    color:0x8B5E3C, labelColor:'#b07040', position:-2.5, icon:'📦' },
+    GLASS:     { id:'glass',     name:'Glass packaging',    subtitle:'Bottles & jars',     color:0x2a6090, labelColor:'#4a90c0', position:-1.5, icon:'🫙' },
+    PAPER:     { id:'paper',     name:'Paper',              subtitle:'Newspapers & print', color:0x5a9ab5, labelColor:'#5DADE2', position:-0.5, icon:'📰' },
+    PLASTIC:   { id:'plastic',   name:'Plastic packaging',  subtitle:'Bottles & bags',     color:0xc02080, labelColor:'#e040a0', position: 0.5, icon:'🧴' },
+    METAL:     { id:'metal',     name:'Metals',             subtitle:'Tins & cans',        color:0x708090, labelColor:'#a0b0c0', position: 1.5, icon:'🥫' },
+    BURNABLE:  { id:'burnable',  name:'Burnable waste',     subtitle:'Mixed / last resort',color:0xcc4422, labelColor:'#ff6347', position: 2.5, icon:'🔥' },
+    CENTER:    { id:'center',    name:'Recycling Centre',   subtitle:'Large & hazardous',  color:0xb8900a, labelColor:'#FFD700', position: 3.5, icon:'🏭' }
+};
+
+const ITEMS = [
+    // Cardboard / cartons
+    { name:"Clean Cardboard Box",      type:'cardboard', shape:'box',       color:0xb07840, fact:"Flatten boxes before recycling — it saves huge amounts of space in collection trucks." },
+    { name:"Egg Carton (Paper)",        type:'cardboard', shape:'flatbox',   color:0xd4aa70, fact:"Clean paper egg cartons go into paperboard recycling — great for the environment!" },
+    { name:"Empty Milk Carton",         type:'cardboard', shape:'carton',    color:0xf0e8d0, fact:"Rinse milk cartons and flatten them. They're coated paperboard — paperboard bin!" },
+    { name:"Juice Carton",             type:'cardboard', shape:'carton',    color:0xffa030, fact:"Juice cartons (Tetra Pak) are recyclable paperboard — rinse and crush first." },
+    { name:"Pizza Box (Clean)",         type:'cardboard', shape:'flatbox',   color:0xc87040, fact:"A clean pizza box is fine in paperboard — only grease-soaked ones are a problem." },
+
+    // Paper
+    { name:"Newspaper",                type:'paper',     shape:'flatbox',   color:0xe8dfc0, fact:"Recycling one ton of paper saves 17 mature trees and 7,000 gallons of water!" },
+    { name:"Magazine",                 type:'paper',     shape:'flatbox',   color:0xff80a0, fact:"Glossy magazines are still recyclable — the coating separates during pulping." },
+    { name:"Envelope",                 type:'paper',     shape:'flatbox',   color:0xf0e0b0, fact:"Envelopes with plastic windows can be recycled as paper — the plastic floats off." },
+
+    // Glass
+    { name:"Glass Bottle",             type:'glass',     shape:'bottle',    color:0x80cc80, fact:"Glass takes over a million years to decompose, but can be recycled endlessly!" },
+    { name:"Wine Bottle",              type:'glass',     shape:'bottle',    color:0x2a5040, fact:"Green glass gets its colour from iron, chromium and copper oxides." },
+    { name:"Glass Jar (with lid)",     type:'glass',     shape:'jar',       color:0x90d0e0, fact:"Remove the metal lid and recycle it separately in the metals bin." },
+
+    // Plastic
+    { name:"Plastic Bottle",           type:'plastic',   shape:'bottle',    color:0x80c0ff, fact:"PET plastic bottles can be turned into polyester fibre for clothing!" },
+    { name:"Plastic Straw",            type:'plastic',   shape:'can',       color:0xffd700, fact:"Straws are plastic packaging — check local rules, many now accept them." },
+    { name:"Plastic Bag",             type:'plastic',   shape:'flatbox',   color:0xeef8ff, fact:"Soft plastics go in plastic packaging recycling — don't put loose in paper bin." },
+    { name:"Empty Yogurt Cup (Clean)", type:'plastic',   shape:'cup',       color:0xfff5dc, fact:"Rinse yogurt cups thoroughly — food residue contaminates whole batches." },
+
+    // Metal
+    { name:"Aluminium Can",            type:'metal',     shape:'can',       color:0xd0d8e0, fact:"Aluminium cans can be recycled infinitely without any loss of quality." },
+    { name:"Soda Can",                 type:'metal',     shape:'can',       color:0xff6040, fact:"Recycling aluminium uses 95% less energy than smelting new aluminium!" },
+    { name:"Sardine Can",              type:'metal',     shape:'can',       color:0xb0c0c8, fact:"Rinse food tins well — they can all go in the metals bin once clean." },
+    { name:"Tin Foil (Clean)",         type:'metal',     shape:'flatbox',   color:0xd8e0e8, fact:"Scrunch clean aluminium foil into a ball so it doesn't get lost in machinery." },
+
+    // Bio
+    { name:"Banana Peel",              type:'bio',       shape:'sphere',    color:0xffe135, fact:"Food waste in landfills produces methane — a greenhouse gas 80× more potent than CO₂." },
+    { name:"Apple Core",               type:'bio',       shape:'sphere',    color:0xff5050, fact:"An apple core takes about 2 months to decompose; in compost it feeds the soil." },
+    { name:"Coffee Grounds",           type:'bio',       shape:'sphere',    color:0x3d2817, fact:"Coffee grounds are rich in nitrogen — they make excellent compost or garden mulch." },
+    { name:"Potato Peels",             type:'bio',       shape:'sphere',    color:0xc8a060, fact:"All vegetable scraps are biowaste gold — they cut landfill methane significantly." },
+    { name:"Eggshells",               type:'bio',       shape:'sphere',    color:0xfff8e0, fact:"Eggshells add calcium to compost and help balance the pH of garden soil." },
+
+    // Burnable
+    { name:"Dirty Pizza Box",          type:'burnable',  shape:'flatbox',   color:0x8b5010, fact:"Greasy cardboard can't be recycled — food oils ruin paper pulp quality." },
+    { name:"Styrofoam Cup",            type:'burnable',  shape:'cup',       color:0xf5f5f5, fact:"Expanded polystyrene is rarely recyclable curbside — it belongs in burnable waste." },
+    { name:"Broken Toy",              type:'burnable',  shape:'box',       color:0xff80a0, fact:"Mixed-material toys can't be separated for recycling — burnable waste it is." },
+    { name:"Empty Coffee Take-Away Cup",type:'burnable', shape:'cup',       color:0xc08060, fact:"Take-away cups have a thin plastic lining fused to the paper — that makes them mixed/burnable waste." },
+    { name:"Used Paper Towel",         type:'burnable',  shape:'flatbox',   color:0xe0d0b0, fact:"Soiled paper towels contaminate paper recycling batches — burnable waste." },
+
+    // Recycling Centre
+    { name:"Broken TV",               type:'center',    shape:'tv',        color:0x303040, fact:"TVs contain lead, cadmium and mercury — always take e-waste to a recycling centre." },
+    { name:"Electronic Waste",        type:'center',    shape:'box',       color:0x4a0090, fact:"E-waste contains gold, silver and copper — recycling centres recover these metals." },
+    { name:"Broken Mirror",           type:'center',    shape:'flatbox',   color:0xd0f0ff, fact:"Mirrors have a metallic coating and different melting point to glass — take to recycling centre." },
+    { name:"Broken Shoes",            type:'center',    shape:'box',       color:0x6b4010, fact:"Textiles and shoes should go to special collection points or recycling centres." },
+    { name:"Old Pillow",              type:'center',    shape:'box',       color:0xffe4b5, fact:"Pillows can't go in household recycling — take to a textile recycling point." },
+    { name:"Metal Bedframe",          type:'center',    shape:'box',       color:0x808080, fact:"Large metal items must go to a recycling centre for proper metal recovery." },
+];
+
+// ─── 3D model builder ───────────────────────────────────────────────────────
+
+function buildBottle(color, isWine) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, transparent:true, opacity:0.88, roughness:0.15, metalness:0 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.7, 20), mat);
+    body.position.y = 0;
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.22, 0.25, 16), mat);
+    neck.position.y = 0.475;
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.18, 16), mat);
+    top.position.y = 0.69;
+    const capMat = new THREE.MeshStandardMaterial({ color:0x333333 });
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 16), capMat);
+    cap.position.y = 0.81;
+    const baseMat = new THREE.MeshStandardMaterial({ color, transparent:true, opacity:0.95 });
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.2, 0.08, 20), baseMat);
+    base.position.y = -0.39;
+    g.add(body, neck, top, cap, base);
+    return g;
+}
+
+function buildCan(color) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, metalness:0.85, roughness:0.15 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.58, 24), mat);
+    const topMat = new THREE.MeshStandardMaterial({ color:0xd0d8e0, metalness:0.9, roughness:0.1 });
+    const topCap = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.04, 24), topMat);
+    topCap.position.y = 0.31;
+    const botCap = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.04, 24), topMat);
+    botCap.position.y = -0.31;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.02, 8, 20), topMat);
+    ring.position.y = 0.34;
+    ring.rotation.x = Math.PI/2;
+    g.add(body, topCap, botCap, ring);
+    return g;
+}
+
+function buildJar(color) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, transparent:true, opacity:0.82, roughness:0.1 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.22, 0.55, 20), mat);
+    const lidMat = new THREE.MeshStandardMaterial({ color:0x888800, metalness:0.7, roughness:0.3 });
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.08, 20), lidMat);
+    lid.position.y = 0.315;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.05, 20), mat);
+    base.position.y = -0.3;
+    g.add(body, lid, base);
+    return g;
+}
+
+function buildBox(color) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness:0.8 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 0.55), mat);
+    const edgeMat = new THREE.MeshStandardMaterial({ color:0x000000, roughness:1 });
+    // tape strip
+    const tape = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.06, 0.06), new THREE.MeshStandardMaterial({ color:0xc8b060, roughness:0.6 }));
+    tape.position.set(0, 0.26, 0);
+    g.add(body, tape);
+    return g;
+}
+
+function buildFlatBox(color) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness:0.85 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.12, 0.55), mat);
+    g.add(body);
+    return g;
+}
+
+function buildSphere(color) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness:0.7 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 18, 18), mat);
+    g.add(body);
+    return g;
+}
+
+function buildCup(color) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness:0.55 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.5, 20), mat);
+    const rimMat = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.4 });
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.02, 8, 24), rimMat);
+    rim.position.y = 0.25;
+    rim.rotation.x = Math.PI/2;
+    g.add(body, rim);
+    return g;
+}
+
+function buildCarton(color) {
+    // Gabled-top milk/juice carton
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color, roughness:0.65 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.65, 0.28), mat);
+    // gabled top (two triangular prisms approximated with a pointed box)
+    const topMat = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.5 });
+    const top = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.18, 0.28), topMat);
+    top.position.y = 0.415;
+    // ridge line
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.3), topMat);
+    ridge.position.y = 0.415;
+    g.add(body, top, ridge);
+    return g;
+}
+
+function buildTV(color) {
+    const g = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color, roughness:0.6 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.55, 0.22), bodyMat);
+    const screenMat = new THREE.MeshStandardMaterial({ color:0x111122, roughness:0.1, metalness:0.3 });
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.42, 0.02), screenMat);
+    screen.position.set(0, 0, 0.12);
+    // crack lines on screen
+    const crackMat = new THREE.MeshBasicMaterial({ color:0x888888 });
+    const crack1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.01, 0.005), crackMat);
+    crack1.position.set(-0.1, 0.05, 0.135); crack1.rotation.z = 0.6;
+    const crack2 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.01, 0.005), crackMat);
+    crack2.position.set(0.05, -0.06, 0.135); crack2.rotation.z = -0.4;
+    const standMat = new THREE.MeshStandardMaterial({ color:0x222222, roughness:0.8 });
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 0.12), standMat);
+    stand.position.y = -0.305;
+    g.add(body, screen, crack1, crack2, stand);
+    return g;
+}
+
+function buildItemMesh(itemData) {
+    switch (itemData.shape) {
+        case 'bottle':  return buildBottle(itemData.color);
+        case 'can':     return buildCan(itemData.color);
+        case 'jar':     return buildJar(itemData.color);
+        case 'box':     return buildBox(itemData.color);
+        case 'flatbox': return buildFlatBox(itemData.color);
+        case 'sphere':  return buildSphere(itemData.color);
+        case 'cup':     return buildCup(itemData.color);
+        case 'carton':  return buildCarton(itemData.color);
+        case 'tv':      return buildTV(itemData.color);
+        default:        return buildBox(itemData.color);
+    }
+}
+
+// ─── Sky gradient background ─────────────────────────────────────────────────
+
+function createSkyGradient(scene) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2; canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0,   '#1a3a6e');  // deep sky blue
+    grad.addColorStop(0.4, '#3a7abf');  // mid blue
+    grad.addColorStop(0.7, '#80c8e8');  // horizon light blue
+    grad.addColorStop(1,   '#c8e8f0');  // near-horizon pale
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 2, 256);
+    const tex = new THREE.CanvasTexture(canvas);
+    scene.background = tex;
+    scene.fog = new THREE.Fog(0x80c8e8, 30, 70);
+}
+
+// ─── Game class ──────────────────────────────────────────────────────────────
+
+class SortGame {
+    constructor() {
+        this.scene = null; this.camera = null; this.renderer = null;
+        this.bins = []; this.currentItem = null;
+        this.score = 0; this.highScore = parseInt(localStorage.getItem('sortRushHigh') || '0');
+        this.combo = 0; this.itemsSorted = 0;
+        this.gameActive = false;
+        this.timer = 100; this.maxTime = 100; this.timerDecay = 0.1;
+        this.currentPhase = 1; this.itemFlying = false;
+        this.particles = [];
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+        this.init();
+    }
+
+    init() {
+        this.scene = new THREE.Scene();
+        createSkyGradient(this.scene);
+
+        this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
+        this.camera.position.set(0, 10, 20);
+        this.camera.lookAt(0, 0, 0);
+
+        this.renderer = new THREE.WebGLRenderer({ antialias:true });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
+        document.getElementById('game-container').appendChild(this.renderer.domElement);
+
+        // Lighting
+        const ambient = new THREE.AmbientLight(0xd0e8ff, 0.6);
+        this.scene.add(ambient);
+        const sun = new THREE.DirectionalLight(0xfff8e0, 1.1);
+        sun.position.set(8, 20, 12);
+        sun.castShadow = true;
+        sun.shadow.mapSize.width = 2048; sun.shadow.mapSize.height = 2048;
+        sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 60;
+        sun.shadow.camera.left = -22; sun.shadow.camera.right = 22;
+        sun.shadow.camera.top = 22; sun.shadow.camera.bottom = -22;
+        this.scene.add(sun);
+        const fillLight = new THREE.DirectionalLight(0xb0d0ff, 0.35);
+        fillLight.position.set(-5, 8, -5);
+        this.scene.add(fillLight);
+
+        // Ground — tiled texture via canvas
+        const groundCanvas = document.createElement('canvas');
+        groundCanvas.width = 256; groundCanvas.height = 256;
+        const gc = groundCanvas.getContext('2d');
+        gc.fillStyle = '#5a8a2a';
+        gc.fillRect(0, 0, 256, 256);
+        gc.fillStyle = '#4e7a22';
+        for (let i = 0; i < 60; i++) {
+            gc.fillRect(Math.random()*256, Math.random()*256, 8+Math.random()*20, 3+Math.random()*6);
+        }
+        const groundTex = new THREE.CanvasTexture(groundCanvas);
+        groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+        groundTex.repeat.set(8, 8);
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(100, 50),
+            new THREE.MeshStandardMaterial({ map:groundTex, roughness:0.95 })
+        );
+        ground.rotation.x = -Math.PI/2;
+        ground.position.y = -2;
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+
+        // Subtle path under bins
+        const path = new THREE.Mesh(
+            new THREE.PlaneGeometry(40, 5),
+            new THREE.MeshStandardMaterial({ color:0xa09080, roughness:0.9 })
+        );
+        path.rotation.x = -Math.PI/2;
+        path.position.set(0, -1.98, -2);
+        path.receiveShadow = true;
+        this.scene.add(path);
+
+        this.createBins();
+        this.setupInput();
+        this.animate();
+        document.getElementById('high-score').textContent = this.highScore;
+        window.addEventListener('resize', () => this.onResize());
+    }
+
+    createBins() {
+        Object.values(BIN_TYPES).forEach(bt => this.createBin(bt));
+    }
+
+    createBin(binType) {
+        const group = new THREE.Group();
+        const W=2.0, H=2.5, D=2.0;
+
+        // Body with slight bevel effect via two boxes
+        const mat = new THREE.MeshStandardMaterial({ color:binType.color, roughness:0.45, metalness:0.05 });
+        const bin = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), mat);
+        bin.castShadow = true; bin.receiveShadow = true;
+        bin.position.y = -1 + H/2;
+
+        // Rim
+        const rim = new THREE.Mesh(
+            new THREE.BoxGeometry(W+0.15, 0.22, D+0.15),
+            new THREE.MeshStandardMaterial({ color:0x1a1a1a, roughness:0.6 })
+        );
+        rim.position.y = -1 + H;
+
+        // Opening
+        const hole = new THREE.Mesh(
+            new THREE.PlaneGeometry(W-0.3, D-0.3),
+            new THREE.MeshBasicMaterial({ color:0x090909 })
+        );
+        hole.rotation.x = -Math.PI/2;
+        hole.position.y = -1 + H + 0.02;
+
+        // Highlight stripe
+        const stripeMat = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.6, opacity:0.18, transparent:true });
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.12, H*0.6, D+0.02), stripeMat);
+        stripe.position.set(W/2-0.12, -1+H*0.35, 0);
+
+        // Icon on front face
+        const iconCanvas = document.createElement('canvas');
+        iconCanvas.width = 256; iconCanvas.height = 256;
+        const ctx = iconCanvas.getContext('2d');
+        ctx.font = '160px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(binType.icon, 128, 128);
+        const iconTex = new THREE.CanvasTexture(iconCanvas);
+        const icon = new THREE.Mesh(
+            new THREE.PlaneGeometry(1.0, 1.0),
+            new THREE.MeshBasicMaterial({ map:iconTex, transparent:true, side:THREE.DoubleSide })
+        );
+        icon.position.set(0, 0.5, D/2 + 0.01);
+
+        group.add(bin, rim, hole, stripe, icon);
+        group.position.set(binType.position * 2.2, 0, -2);
+
+        // Invisible hitbox
+        const hitboxMat = new THREE.MeshBasicMaterial({ visible:false });
+        const hitbox = new THREE.Mesh(new THREE.BoxGeometry(W+1, H+2, D+1), hitboxMat);
+        hitbox.position.y = H/2;
+        hitbox.userData.isHitbox = true;
+        hitbox.userData.binType = binType.id;
+        group.add(hitbox);
+
+        group.userData = { type:binType.id, name:binType.name, isBin:true };
+        this.bins.push(group);
+        this.scene.add(group);
+        this.createBinLabel(binType, group);
+    }
+
+    createBinLabel(binType, group) {
+        const div = document.createElement('div');
+        div.className = 'bin-label';
+        div.innerHTML = `<div style="font-size:22px;margin-bottom:3px">${binType.icon}</div><div style="color:${binType.labelColor}">${binType.name}</div><div class="sublabel">${binType.subtitle}</div>`;
+        div.id = `label-${binType.id}`;
+        document.getElementById('ui-layer').appendChild(div);
+        group.userData.label = div;
+    }
+
+    updateLabels() {
+        this.bins.forEach(bin => {
+            const pos = bin.position.clone();
+            pos.y += 3.5;
+            pos.project(this.camera);
+            const x = (pos.x*.5+.5)*window.innerWidth;
+            const y = (-(pos.y*.5)+.5)*window.innerHeight;
+            if (bin.userData.label) {
+                bin.userData.label.style.left = x+'px';
+                bin.userData.label.style.top  = y+'px';
+                bin.userData.label.style.display = pos.z > 1 ? 'none' : 'block';
+            }
+        });
+    }
+
+    spawnItem() {
+        if (this.currentItem) this.scene.remove(this.currentItem);
+        this.updateDifficulty();
+
+        const itemData = ITEMS[Math.floor(Math.random()*ITEMS.length)];
+        const group = new THREE.Group();
+        const mesh = buildItemMesh(itemData);
+        mesh.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
+        group.add(mesh);
+        group.position.set(0, 1, 6);
+        group.userData = { ...itemData };
+        this.currentItem = group;
+        this.scene.add(group);
+
+        document.getElementById('item-name').textContent = itemData.name;
+        document.getElementById('item-hint').textContent = 'Click the correct bin!';
+        this.timer = this.maxTime;
+        this.updateTimerBar();
+    }
+
+    setupInput() {
+        const canvas = this.renderer.domElement;
+        canvas.style.cursor = 'pointer';
+        canvas.addEventListener('click', e => this.onClick(e));
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const t = e.touches[0];
+            this.onClick({ clientX:t.clientX, clientY:t.clientY });
+        });
+        canvas.addEventListener('mousemove', e => {
+            this.mouse.x = (e.clientX/window.innerWidth)*2-1;
+            this.mouse.y = -(e.clientY/window.innerHeight)*2+1;
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            const hb = [];
+            this.bins.forEach(b => b.children.forEach(c => { if (c.userData.isHitbox) hb.push(c); }));
+            canvas.style.cursor = this.raycaster.intersectObjects(hb).length > 0 ? 'pointer' : 'default';
+        });
+    }
+
+    onClick(event) {
+        if (!this.gameActive || this.itemFlying) return;
+        this.mouse.x = (event.clientX/window.innerWidth)*2-1;
+        this.mouse.y = -(event.clientY/window.innerHeight)*2+1;
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const hb = [];
+        this.bins.forEach(b => b.children.forEach(c => { if (c.userData.isHitbox) hb.push(c); }));
+        const hits = this.raycaster.intersectObjects(hb);
+        if (hits.length > 0) {
+            const bt = hits[0].object.userData.binType;
+            const bin = this.bins.find(b => b.userData.type === bt);
+            if (bin) this.throwItemToBin(bin);
+        }
+    }
+
+    throwItemToBin(targetBin) {
+        if (this.itemFlying) return;
+        this.itemFlying = true;
+        const item = this.currentItem;
+        const startPos = item.position.clone();
+        const targetPos = targetBin.position.clone();
+        targetPos.y += 2;
+        let progress = 0;
+        const duration = 0.6;
+        const animate = () => {
+            progress += 0.016/duration;
+            if (progress >= 1) { this.checkAnswer(targetBin); return; }
+            const t = progress;
+            item.position.x = startPos.x + (targetPos.x-startPos.x)*t;
+            item.position.z = startPos.z + (targetPos.z-startPos.z)*t;
+            item.position.y = startPos.y + (targetPos.y-startPos.y)*t + Math.sin(t*Math.PI)*3;
+            item.rotation.x += 0.15; item.rotation.z += 0.1;
+            requestAnimationFrame(animate);
+        };
+        animate();
+    }
+
+    checkAnswer(bin) {
+        const itemType = this.currentItem.userData.type;
+        const binType  = bin.userData.type;
+        if (itemType === binType) {
+            const pts = 100 + Math.floor(this.timer) + (this.combo*50);
+            this.score += pts; this.combo++; this.itemsSorted++;
+            document.getElementById('score').textContent = this.score;
+            document.getElementById('items-count').textContent = this.itemsSorted;
+            if (this.combo > 1) {
+                const el = document.getElementById('combo');
+                el.textContent = `x${this.combo} Combo!`;
+                el.classList.add('active');
+                setTimeout(() => el.classList.remove('active'), 1000);
+            }
+            this.createParticles(bin.position, 0x00c9a7);
+            this.animateItemIntoBin(bin);
+        } else {
+            this.gameOver(bin.userData.name, binType);
+        }
+    }
+
+    animateItemIntoBin(bin) {
+        const item = this.currentItem;
+        let progress = 0;
+        const animate = () => {
+            progress += 0.1;
+            if (progress >= 1) { this.itemFlying = false; this.spawnItem(); return; }
+            item.position.y += (bin.position.y - 1 - item.position.y) * 0.2;
+            item.scale.setScalar(1 - progress*0.5);
+            requestAnimationFrame(animate);
+        };
+        animate();
+    }
+
+    updateDifficulty() {
+        const prev = this.currentPhase;
+        if      (this.itemsSorted >= 16) { this.currentPhase=3; this.maxTime=80;  this.timerDecay=0.35; }
+        else if (this.itemsSorted >=  8) { this.currentPhase=2; this.maxTime=120; this.timerDecay=0.25; }
+        else                             { this.currentPhase=1; this.maxTime=300; this.timerDecay=0.1;  }
+        if (prev !== this.currentPhase && prev !== 0) {
+            if (this.currentPhase===2) { this.showSpeedUp("⏩ SPEED UP!"); this.updatePhaseIndicator("🐇 Fast Mode"); }
+            if (this.currentPhase===3) { this.showSpeedUp("🔥 MAX SPEED!"); this.updatePhaseIndicator("⚡ Expert Mode"); }
+        } else if (this.currentPhase===1) {
+            this.updatePhaseIndicator("🐢 Relaxed Mode");
+        }
+    }
+
+    showSpeedUp(text) {
+        const el = document.getElementById('speed-up');
+        el.textContent = text; el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 1500);
+    }
+
+    updatePhaseIndicator(text) {
+        const el = document.getElementById('phase-indicator');
+        el.textContent = text; el.classList.add('active');
+    }
+
+    createParticles(pos, color) {
+        for (let i = 0; i < 28; i++) {
+            const geo = new THREE.BoxGeometry(0.13,0.13,0.13);
+            const mat = new THREE.MeshBasicMaterial({ color });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(pos); mesh.position.y += 2;
+            const vel = { x:(Math.random()-.5)*8, y:Math.random()*8, z:(Math.random()-.5)*8 };
+            this.scene.add(mesh);
+            this.particles.push({ mesh, vel, life:1.0 });
+        }
+    }
+
+    updateParticles() {
+        for (let i = this.particles.length-1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.life -= 0.02;
+            p.mesh.position.x += p.vel.x*0.016;
+            p.mesh.position.y += p.vel.y*0.016;
+            p.mesh.position.z += p.vel.z*0.016;
+            p.vel.y -= 9.8*0.016;
+            p.mesh.rotation.x += 0.1; p.mesh.rotation.y += 0.1;
+            p.mesh.scale.setScalar(p.life);
+            if (p.life <= 0) { this.scene.remove(p.mesh); this.particles.splice(i,1); }
+        }
+    }
+
+    updateTimer() {
+        if (!this.gameActive || this.itemFlying) return;
+        this.timer -= this.timerDecay;
+        if (this.timer <= 0) { this.timer=0; this.gameOver("time out","timeout"); }
+        this.updateTimerBar();
+    }
+
+    updateTimerBar() {
+        const bar = document.getElementById('timer-bar');
+        const pct = (this.timer/this.maxTime)*100;
+        bar.style.width = pct+'%';
+        if (pct>60) bar.style.background='#00c9a7';
+        else if (pct>30) bar.style.background='#fdcb6e';
+        else bar.style.background='#ff6b6b';
+    }
+
+    gameOver(landedIn, binType) {
+        this.gameActive = false; this.itemFlying = false;
+        const id = this.currentItem.userData;
+        let factText;
+        if (binType==='timeout') {
+            factText = `Time's up! <span class="wrong-bin">${id.name}</span> should go to <span class="correct-bin">${BIN_TYPES[id.type.toUpperCase()].name}</span>.<br><br>${id.fact}`;
+        } else {
+            const correctName = BIN_TYPES[id.type.toUpperCase()].name;
+            factText = `Wrong bin! <span class="wrong-bin">${id.name}</span> goes in <span class="correct-bin">${correctName}</span>, not ${landedIn}.<br><br>${id.fact}`;
+        }
+        document.getElementById('fact-text').innerHTML = factText;
+        document.getElementById('final-score').textContent = this.score;
+        if (this.score > this.highScore) {
+            this.highScore = this.score;
+            localStorage.setItem('sortRushHigh', this.highScore);
+            document.getElementById('high-score').textContent = this.highScore;
+        }
+        document.getElementById('game-container').classList.add('shake');
+        setTimeout(() => document.getElementById('game-container').classList.remove('shake'), 400);
+        setTimeout(() => {
+            document.getElementById('game-over').classList.remove('hidden');
+            document.getElementById('hud').style.display='none';
+            document.getElementById('item-display').style.display='none';
+            document.getElementById('timer-container').style.display='none';
+            document.getElementById('phase-indicator').classList.remove('active');
+            document.querySelectorAll('.bin-label').forEach(l => l.style.display='none');
+        }, 1000);
+    }
+
+    start() {
+        this.score=0; this.combo=0; this.itemsSorted=0;
+        this.currentPhase=0; this.gameActive=true;
+        document.getElementById('score').textContent='0';
+        document.getElementById('items-count').textContent='0';
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('hud').style.display='flex';
+        document.getElementById('item-display').style.display='block';
+        document.getElementById('timer-container').style.display='block';
+        document.querySelectorAll('.bin-label').forEach(l => l.style.display='block');
+        this.spawnItem();
+    }
+
+    onResize() {
+        this.camera.aspect = window.innerWidth/window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        this.updateParticles();
+        this.updateTimer();
+        this.updateLabels();
+        if (this.currentItem && !this.itemFlying && this.gameActive) {
+            this.currentItem.position.y = 1 + Math.sin(Date.now()*0.003)*0.18;
+            this.currentItem.rotation.y += 0.012;
+        }
+        this.renderer.render(this.scene, this.camera);
+    }
+}
+
+const game = new SortGame();
+</script>
+</body>
+</html>
