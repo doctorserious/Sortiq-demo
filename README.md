@@ -1,5 +1,7 @@
 # Sortiq-demo
 
+Startup Weekend Oulu 2026 Spring - Product demo
+
 SortIQ
 Waste sorting education app made initially to be used in Oulu, Finland, but with the option of expanding to the rest of Finland later.
 
