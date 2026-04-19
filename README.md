@@ -1,7 +1,7 @@
 # Sortiq-demo
 
 SortIQ
-Waste sorting education app for PSOAS student housing in Oulu, Finland.
+Waste sorting education app made initially to be used in Oulu, Finland, but with the option of expanding to the rest of Finland later.
 
 Overview
 SortIQ is an interactive mobile web app that helps people learn proper waste sorting through gamified experiences and an AI-powered scanner It provides practical guidance for everyday recycling decisions.
