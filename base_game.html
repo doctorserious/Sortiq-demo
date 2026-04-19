@@ -156,7 +156,21 @@
         }
         .bin-label .sublabel { font-size: 10px; color: #bbb; font-weight: 400; margin-top: 2px; }
         
-        /* ── Mobile bin grid ── */
+        /* Back button — mobile only */
+        #back-btn {
+            display: none;
+            position: absolute; top: 10px; left: 10px;
+            z-index: 50; pointer-events: all;
+            background: rgba(255,255,255,0.92);
+            border: none; border-radius: 50px;
+            padding: 8px 16px; gap: 5px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 14px; font-weight: 700;
+            color: #2d3436; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            align-items: center;
+        }
+        #back-btn:active { transform: scale(0.95); }
         #mobile-bins {
             display: none; /* shown only on mobile */
             position: absolute; bottom: 0; left: 0; right: 0;
@@ -185,21 +199,23 @@
         .mob-bin-btn .mob-name { display: block; font-size: 10px; font-weight: 700; }
         .mob-bin-btn .mob-sub  { display: block; font-size: 9px; color: #aaa; }
 
-        /* On mobile: shrink item display and timer, hide 3D labels */
+        /* On mobile: push item display to top, shrink timer, hide 3D labels */
         @media (max-width: 600px) {
             #mobile-bins { display: block; }
             .bin-label { display: none !important; }
             #item-display {
-                bottom: auto; top: 110px;
+                bottom: auto; top: 80px;
                 padding: 10px 20px;
+                max-width: 80vw;
             }
-            #item-name { font-size: 20px; }
-            #item-hint { font-size: 13px; }
-            #timer-container { bottom: auto; top: 190px; width: 220px; }
-            .score-box { padding: 8px 14px; }
-            .score-label { font-size: 9px; }
-            .score-value { font-size: 24px; }
-            .hud { top: 10px; left: 10px; right: 10px; }
+            #item-name { font-size: 18px; }
+            #item-hint { font-size: 12px; }
+            #timer-container { bottom: auto; top: 168px; width: 200px; }
+            .score-box { padding: 5px 8px; border-radius: 12px; }
+            .score-label { font-size: 8px; letter-spacing: 1px; }
+            .score-value { font-size: 18px; margin-top: 1px; }
+            .hud { top: 8px; left: 90px; right: 6px; gap: 4px; }
+            #back-btn { display: flex !important; }
         }
         
         .instructions {
@@ -212,15 +228,36 @@
             font-weight: 700; color: #fff;
         }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+    /* Load Three.js with fallback, then boot the game */
+    function loadThree(cb) {
+        const urls = [
+            'https://unpkg.com/three@0.128.0/build/three.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
+        ];
+        let i = 0;
+        function tryNext() {
+            if (i >= urls.length) { alert('Failed to load 3D engine. Please check your connection.'); return; }
+            const s = document.createElement('script');
+            s.src = urls[i++];
+            s.onload = cb;
+            s.onerror = tryNext;
+            document.head.appendChild(s);
+        }
+        tryNext();
+    }
+    </script>
 </head>
 <body>
 <div id="game-container">
     <div id="ui-layer">
+        <!-- Back button (mobile only) -->
+        <button id="back-btn" onclick="history.length > 1 ? history.back() : window.close()">◀ Back</button>
         <div class="hud" id="hud" style="display:none;">
             <div class="score-box"><div class="score-label">Score</div><div class="score-value" id="score">0</div></div>
             <div class="score-box"><div class="score-label">High Score</div><div class="score-value" id="high-score">0</div></div>
             <div class="score-box"><div class="score-label">Items</div><div class="score-value" id="items-count">0</div></div>
+        </div>
         </div>
         <div id="phase-indicator">🐢 Relaxed Mode</div>
         <div class="combo-display" id="combo">x2</div>
@@ -525,8 +562,8 @@ class SortGame {
 
         this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
         if (isMobile()) {
-            /* zoom in so the floating item fills the upper half; bins are hidden by the HTML grid */
-            this.camera.position.set(0, 6, 10);
+            /* portrait: pull back further and raise to show all 8 bins in the lower portion */
+            this.camera.position.set(0, 14, 32);
         } else {
             this.camera.position.set(0, 10, 20);
         }
@@ -537,7 +574,7 @@ class SortGame {
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        this.renderer.outputEncoding = THREE.sRGBEncoding;
+        if (THREE.sRGBEncoding) this.renderer.outputEncoding = THREE.sRGBEncoding;
         document.getElementById('game-container').appendChild(this.renderer.domElement);
 
         // Lighting
@@ -909,7 +946,7 @@ class SortGame {
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         if (isMobile()) {
-            this.camera.position.set(0, 6, 10);
+            this.camera.position.set(0, 14, 32);
         } else {
             this.camera.position.set(0, 10, 20);
         }
@@ -929,7 +966,7 @@ class SortGame {
     }
 }
 
-const game = new SortGame();
+loadThree(() => { window.game = new SortGame(); });
 </script>
 </body>
 </html>
